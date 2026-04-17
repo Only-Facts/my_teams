@@ -107,7 +107,9 @@ impl Server {
 
         for addr in disconnected {
             if let Some(client) = self.clients.remove(&addr) {
-                // TODO: FFi call to server_event_user_logged_out if the client was logged (62)
+                if let Some(uuid) = client.uuid {
+                    ffi::call_user_logged_out(&uuid);
+                }
                 let _ = client.stream.shutdown(std::net::Shutdown::Both);
             }
         }
