@@ -1,5 +1,5 @@
-use crate::client::command::Command;
-use crate::client::context::Context;
+use super::command::Command;
+use super::context::Context;
 
 pub fn encode_command(cmd: &Command, ctx: &Context) -> String {
     match cmd {
@@ -28,9 +28,14 @@ pub fn encode_command(cmd: &Command, ctx: &Context) -> String {
         ),
         Command::Create { args } => match (&ctx.team_uuid, &ctx.channel_uuid, &ctx.thread_uuid) {
             (None, None, None) => format!("CREATE_TEAM|{}|{}\n", args[0], args[1]),
-            (Some(team), None, None) => format!("CREATE_CHANNEL|{}|{}|{}\n", team, args[0], args[1]),
+            (Some(team), None, None) => {
+                format!("CREATE_CHANNEL|{}|{}|{}\n", team, args[0], args[1])
+            }
             (Some(team), Some(channel), None) => {
-                format!("CREATE_THREAD|{}|{}|{}|{}\n", team, channel, args[0], args[1])
+                format!(
+                    "CREATE_THREAD|{}|{}|{}|{}\n",
+                    team, channel, args[0], args[1]
+                )
             }
             (Some(team), Some(channel), Some(thread)) => {
                 format!("CREATE_REPLY|{}|{}|{}|{}\n", team, channel, thread, args[0])

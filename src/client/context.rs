@@ -1,4 +1,4 @@
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct Context {
     pub team_uuid: Option<String>,
     pub channel_uuid: Option<String>,
@@ -6,14 +6,6 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new() -> Self {
-        Self {
-            team_uuid: None,
-            channel_uuid: None,
-            thread_uuid: None,
-        }
-    }
-
     pub fn set(
         &mut self,
         team_uuid: Option<String>,

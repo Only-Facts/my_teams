@@ -1,4 +1,4 @@
-use crate::client::command::Command;
+use super::command::Command;
 
 fn tokenize_input(input: &str) -> Result<Vec<String>, String> {
     let mut tokens = Vec::new();
@@ -135,7 +135,9 @@ pub fn parse_command(input: &str) -> Result<Command, String> {
         }
         "/use" => {
             if tokens.len() > 4 {
-                return Err(r#"/use accepts up to "team_uuid" "channel_uuid" "thread_uuid""#.to_string());
+                return Err(
+                    r#"/use accepts up to "team_uuid" "channel_uuid" "thread_uuid""#.to_string(),
+                );
             }
             Ok(Command::Use {
                 team_uuid: tokens.get(1).cloned(),

@@ -1,8 +1,14 @@
-use my_teams::client::command::Command;
-use my_teams::client::context::Context;
-use my_teams::client::parser::parse_command;
-use my_teams::client::protocol::encode_command;
-use my_teams::client::validate::validate_command;
+pub mod command;
+pub mod context;
+pub mod parser;
+pub mod protocol;
+pub mod validate;
+
+use command::Command;
+use context::Context;
+use parser::parse_command;
+use protocol::encode_command;
+use validate::validate_command;
 
 use std::env;
 use std::io::{self, Write};
@@ -38,7 +44,7 @@ fn main() {
     println!("Client ready for {}:{}", ip, port);
 
     let stdin = io::stdin();
-    let mut context = Context::new();
+    let mut context = Context::default();
 
     loop {
         print!("> ");
@@ -71,11 +77,7 @@ fn main() {
                         channel_uuid,
                         thread_uuid,
                     } => {
-                        context.set(
-                            team_uuid.clone(),
-                            channel_uuid.clone(),
-                            thread_uuid.clone(),
-                        );
+                        context.set(team_uuid.clone(), channel_uuid.clone(), thread_uuid.clone());
                         println!("Context updated: {:?}", context);
                     }
                     _ => {
