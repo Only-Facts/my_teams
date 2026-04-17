@@ -109,27 +109,23 @@ impl Database {
             }
 
             match parts[0] {
-                "USER" => {
-                    if parts.len() == 4 {
-                        let user = User {
-                            uuid: parts[1].to_string(),
-                            name: parts[2].to_string(),
-                            is_connected: false,
-                        };
-                        my_teams::ffi::call_user_loaded(&user.uuid, &user.name);
-                        self.users.insert(user.uuid.clone(), user);
-                    }
+                "USER" if parts.len() == 4 => {
+                    let user = User {
+                        uuid: parts[1].to_string(),
+                        name: parts[2].to_string(),
+                        is_connected: false,
+                    };
+                    my_teams::ffi::call_user_loaded(&user.uuid, &user.name);
+                    self.users.insert(user.uuid.clone(), user);
                 }
-                "PM" => {
-                    if parts.len() == 5 {
-                        let msg = Message {
-                            sender_uuid: parts[1].to_string(),
-                            receiver_uuid: parts[2].to_string(),
-                            timestamp: parts[3].parse().unwrap_or(0),
-                            body: parts[4].replace("\\n", "\n"),
-                        };
-                        self.private_messages.push(msg);
-                    }
+                "PM" if parts.len() == 5 => {
+                    let msg = Message {
+                        sender_uuid: parts[1].to_string(),
+                        receiver_uuid: parts[2].to_string(),
+                        timestamp: parts[3].parse().unwrap_or(0),
+                        body: parts[4].replace("\\n", "\n"),
+                    };
+                    self.private_messages.push(msg);
                 }
                 _ => {} // TODO: Implement Teams, Channels & Threads too
             }
