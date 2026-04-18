@@ -20,6 +20,11 @@ pub fn setup_signal_handler() {
 }
 
 unsafe extern "C" {
+
+    /*
+        <== SERVER ==>
+    */
+
     pub fn server_event_team_created(
         team_uuid: *const c_char,
         team_name: *const c_char,
@@ -56,78 +61,107 @@ unsafe extern "C" {
         user_uuid: *const c_char,
         reply_body: *const c_char,
     ) -> i32;
+
+    /*
+        <== CLIENT ==>
+    */
+
+    pub fn client_event_logged_in(user_uuid: *const c_char, user_name: *const c_char);
+    pub fn client_event_logged_out(user_uuid: *const c_char, user_name: *const c_char);
+    pub fn client_event_private_message_received(
+        user_uuid: *const c_char,
+        message_body: *const c_char,
+    );
+
+    pub fn client_print_users(user_uuid: *const c_char, user_name: *const c_char, user_status: i32);
+    pub fn client_print_user(user_uuid: *const c_char, user_name: *const c_char, user_status: i32);
+    pub fn client_private_message_print_messages(
+        sender_uuid: *const c_char,
+        timestamp: u64,
+        message_body: *const c_char,
+    );
+    pub fn client_print_team_created(
+        team_uuid: *const c_char,
+        team_name: *const c_char,
+        team_description: *const c_char,
+    );
+    pub fn client_print_channel_created(
+        channel_uuid: *const c_char,
+        channel_name: *const c_char,
+        channel_description: *const c_char,
+    );
+    pub fn client_print_thread_created(
+        thread_uuid: *const c_char,
+        user_uuid: *const c_char,
+        thread_timestamp: u64,
+        thread_title: *const c_char,
+        thread_body: *const c_char,
+    );
+    pub fn client_print_reply_created(
+        thread_uuid: *const c_char,
+        user_uuid: *const c_char,
+        reply_timestamp: u64,
+        reply_body: *const c_char,
+    );
+    pub fn client_print_subscribed(user_uuid: *const c_char, team_uuid: *const c_char);
+    pub fn client_print_unsubscribed(user_uuid: *const c_char, team_uuid: *const c_char);
+
+    pub fn client_error_unauthorized();
+    pub fn client_error_already_exist();
+    pub fn client_error_unknown_user(user_uuid: *const c_char);
+    pub fn client_error_unknown_team(team_uuid: *const c_char);
 }
 
+macro_rules! c_str {
+    ($s:expr) => {
+        CString::new($s).unwrap_or_default().as_ptr()
+    };
+}
+
+/*
+    <== SERVER ==>
+*/
+
 pub fn call_user_loaded(uuid: &str, name: &str) {
-    if let (Ok(c_uuid), Ok(c_name)) = (CString::new(uuid), CString::new(name)) {
-        unsafe { server_event_user_loaded(c_uuid.as_ptr(), c_name.as_ptr()) };
-    }
+    unsafe { server_event_user_loaded(c_str!(uuid), c_str!(name)) };
 }
 
 pub fn call_user_logged_in(uuid: &str) {
-    if let Ok(c_uuid) = CString::new(uuid) {
-        unsafe { server_event_user_logged_in(c_uuid.as_ptr()) };
-    }
+    unsafe { server_event_user_logged_in(c_str!(uuid)) };
 }
 
 pub fn call_user_created(uuid: &str, name: &str) {
-    if let (Ok(c_uuid), Ok(c_name)) = (CString::new(uuid), CString::new(name)) {
-        unsafe { crate::ffi::server_event_user_created(c_uuid.as_ptr(), c_name.as_ptr()) };
-    }
+    unsafe { server_event_user_created(c_str!(uuid), c_str!(name)) };
 }
 
 pub fn call_user_logged_out(uuid: &str) {
-    if let Ok(c_uuid) = CString::new(uuid) {
-        unsafe { crate::ffi::server_event_user_logged_out(c_uuid.as_ptr()) };
-    }
+    unsafe { server_event_user_logged_out(c_str!(uuid)) };
 }
 
 pub fn call_private_message_sended(sender_uuid: &str, receiver_uuid: &str, body: &str) {
-    if let (Ok(s_uuid), Ok(r_uuid), Ok(c_body)) = (
-        CString::new(sender_uuid),
-        CString::new(receiver_uuid),
-        CString::new(body),
-    ) {
-        unsafe {
-            crate::ffi::server_event_private_message_sended(
-                s_uuid.as_ptr(),
-                r_uuid.as_ptr(),
-                c_body.as_ptr(),
-            )
-        };
-    }
+    unsafe {
+        server_event_private_message_sended(
+            c_str!(sender_uuid),
+            c_str!(receiver_uuid),
+            c_str!(body),
+        )
+    };
 }
 
 pub fn call_user_subscribed(team_uuid: &str, user_uuid: &str) {
-    if let (Ok(t), Ok(u)) = (CString::new(team_uuid), CString::new(user_uuid)) {
-        unsafe { server_event_user_subscribed(t.as_ptr(), u.as_ptr()) };
-    }
+    unsafe { server_event_user_subscribed(c_str!(team_uuid), c_str!(user_uuid)) };
 }
 
 pub fn call_user_unsubscribed(team_uuid: &str, user_uuid: &str) {
-    if let (Ok(t), Ok(u)) = (CString::new(team_uuid), CString::new(user_uuid)) {
-        unsafe { server_event_user_unsubscribed(t.as_ptr(), u.as_ptr()) };
-    }
+    unsafe { server_event_user_unsubscribed(c_str!(team_uuid), c_str!(user_uuid)) };
 }
 
 pub fn call_team_created(team_uuid: &str, name: &str, user_uuid: &str) {
-    if let (Ok(t), Ok(n), Ok(u)) = (
-        CString::new(team_uuid),
-        CString::new(name),
-        CString::new(user_uuid),
-    ) {
-        unsafe { server_event_team_created(t.as_ptr(), n.as_ptr(), u.as_ptr()) };
-    }
+    unsafe { server_event_team_created(c_str!(team_uuid), c_str!(name), c_str!(user_uuid)) };
 }
 
 pub fn call_channel_created(team_uuid: &str, channel_uuid: &str, name: &str) {
-    if let (Ok(t), Ok(c), Ok(n)) = (
-        CString::new(team_uuid),
-        CString::new(channel_uuid),
-        CString::new(name),
-    ) {
-        unsafe { server_event_channel_created(t.as_ptr(), c.as_ptr(), n.as_ptr()) };
-    }
+    unsafe { server_event_channel_created(c_str!(team_uuid), c_str!(channel_uuid), c_str!(name)) };
 }
 
 pub fn call_thread_created(
@@ -137,25 +171,135 @@ pub fn call_thread_created(
     title: &str,
     body: &str,
 ) {
-    if let (Ok(c), Ok(t), Ok(u), Ok(ti), Ok(b)) = (
-        CString::new(channel_uuid),
-        CString::new(thread_uuid),
-        CString::new(user_uuid),
-        CString::new(title),
-        CString::new(body),
-    ) {
-        unsafe {
-            server_event_thread_created(c.as_ptr(), t.as_ptr(), u.as_ptr(), ti.as_ptr(), b.as_ptr())
-        };
-    }
+    unsafe {
+        server_event_thread_created(
+            c_str!(channel_uuid),
+            c_str!(thread_uuid),
+            c_str!(user_uuid),
+            c_str!(title),
+            c_str!(body),
+        )
+    };
 }
 
 pub fn call_reply_created(thread_uuid: &str, user_uuid: &str, reply_body: &str) {
-    if let (Ok(t), Ok(u), Ok(r)) = (
-        CString::new(thread_uuid),
-        CString::new(user_uuid),
-        CString::new(reply_body),
-    ) {
-        unsafe { server_event_reply_created(t.as_ptr(), u.as_ptr(), r.as_ptr()) };
-    }
+    unsafe {
+        server_event_reply_created(c_str!(thread_uuid), c_str!(user_uuid), c_str!(reply_body))
+    };
+}
+
+/*
+    <== CLIENT ==>
+*/
+
+pub fn call_client_event_logged_in(user_uuid: &str, user_name: &str) {
+    unsafe { client_event_logged_in(c_str!(user_uuid), c_str!(user_name)) };
+}
+
+pub fn call_client_event_logged_out(user_uuid: &str, user_name: &str) {
+    unsafe { client_event_logged_out(c_str!(user_uuid), c_str!(user_name)) };
+}
+
+pub fn call_client_event_private_message_received(user_uuid: &str, message_body: &str) {
+    unsafe { client_event_private_message_received(c_str!(user_uuid), c_str!(message_body)) };
+}
+
+pub fn call_client_print_users(user_uuid: &str, user_name: &str, user_status: i32) {
+    unsafe { client_print_users(c_str!(user_uuid), c_str!(user_name), user_status) };
+}
+
+pub fn call_client_print_user(user_uuid: &str, user_name: &str, user_status: i32) {
+    unsafe { client_print_user(c_str!(user_uuid), c_str!(user_name), user_status) };
+}
+
+pub fn call_client_private_message_print_messages(
+    sender_uuid: &str,
+    timestamp: u64,
+    message_body: &str,
+) {
+    unsafe {
+        client_private_message_print_messages(c_str!(sender_uuid), timestamp, c_str!(message_body))
+    };
+}
+
+pub fn call_client_print_team_created(team_uuid: &str, team_name: &str, team_description: &str) {
+    unsafe {
+        client_print_team_created(
+            c_str!(team_uuid),
+            c_str!(team_name),
+            c_str!(team_description),
+        )
+    };
+}
+
+pub fn call_client_print_channel_created(
+    channel_uuid: &str,
+    channel_name: &str,
+    channel_description: &str,
+) {
+    unsafe {
+        client_print_channel_created(
+            c_str!(channel_uuid),
+            c_str!(channel_name),
+            c_str!(channel_description),
+        )
+    };
+}
+
+pub fn call_client_print_thread_created(
+    thread_uuid: &str,
+    user_uuid: &str,
+    thread_timestamp: u64,
+    thread_title: &str,
+    thread_body: &str,
+) {
+    unsafe {
+        client_print_thread_created(
+            c_str!(thread_uuid),
+            c_str!(user_uuid),
+            thread_timestamp,
+            c_str!(thread_title),
+            c_str!(thread_body),
+        )
+    };
+}
+
+pub fn call_client_print_reply_created(
+    thread_uuid: &str,
+    user_uuid: &str,
+    reply_timestamp: u64,
+    reply_body: &str,
+) {
+    unsafe {
+        client_print_reply_created(
+            c_str!(thread_uuid),
+            c_str!(user_uuid),
+            reply_timestamp,
+            c_str!(reply_body),
+        )
+    };
+}
+
+pub fn call_client_print_subscribed(user_uuid: &str, team_uuid: &str) {
+    unsafe { client_print_subscribed(c_str!(user_uuid), c_str!(team_uuid)) };
+}
+
+pub fn call_client_print_unsubscribed(user_uuid: &str, team_uuid: &str) {
+    unsafe { client_print_unsubscribed(c_str!(user_uuid), c_str!(team_uuid)) };
+}
+
+pub fn call_client_error_unauthorized() {
+    unsafe { client_error_unauthorized() };
+}
+
+pub fn call_client_error_already_exist() {
+    unsafe { client_error_already_exist() };
+}
+
+pub fn call_client_error_unknown_user(user_uuid: &str) {
+    unsafe { client_error_unknown_user(c_str!(user_uuid)) };
+}
+
+pub fn call_client_error_unknown_team(team_uuid: &str) {
+    unsafe { client_error_unknown_team(c_str!(team_uuid)) };
 }
