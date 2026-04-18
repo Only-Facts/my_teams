@@ -35,6 +35,7 @@ pub struct Thread {
     pub message: String,
     pub author_uuid: String,
     pub replies: Vec<Message>,
+    pub timestamp: u64,
 }
 
 #[derive(Clone)]
