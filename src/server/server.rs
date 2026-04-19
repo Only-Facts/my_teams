@@ -59,6 +59,7 @@ impl Server {
         let command = args[0].as_str();
 
         match command {
+            "/help" => self.cmd_help(addr),
             "/login" => self.cmd_login(addr, &args),
             "/logout" => self.cmd_logout(addr),
             "/send" => self.cmd_send(addr, &args),

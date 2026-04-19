@@ -11,9 +11,17 @@ use crate::{
 const MAX_NAME_LENGTH: usize = 32;
 const MAX_DESCRIPTION_LENGTH: usize = 255;
 const MAX_BODY_LENGTH: usize = 512;
+const HELP_COMMAND: &str = "/help : show help\n/login [”user_name”] : set the user_name used by client\n/logout : disconnect the client from the server\n/users : get the list of all users that exist on the domain\n/user [”user_uuid”] : get details about the requested user\n/send [”user_uuid”] [”message_body”] : send a message to specific user\n/messages [”user_uuid”] : list all messages exchanged with the specified user\n/subscribe [”team_uuid”] : subscribe to the events of a team and its sub directories (enable reception of all events from a team)\n/subscribed ?[”team_uuid”] : list all subscribed teams or list all users subscribed to a team\n/unsubscribe [”team_uuid”] : unsubscribe from a team\n/use ?[”team_uuid”] ?[”channel_uuid”] ?[”thread_uuid”] : Sets the command context to a team/channel/thread\n/create : based on the context, create the sub resource\n/list : based on the context, list all the sub resources\n/info : based on the context, display details of the current resource";
 
 impl Server {
-    pub(crate) fn cmd_login(&mut self, addr: SocketAddr, args: &[String]) {
+    pub fn cmd_help(&mut self, addr: SocketAddr) {
+        if let Some(client) = self.clients.get_mut(&addr) {
+            client.queue_message(&format!(
+                "200 Help OK\n\nAvailable commands:\n{HELP_COMMAND}"
+            ));
+        }
+    }
+    pub fn cmd_login(&mut self, addr: SocketAddr, args: &[String]) {
         if args.len() != 2 {
             self.send_to(addr, "400 Bad Request: Missing user_name");
             return;
@@ -61,7 +69,7 @@ impl Server {
         ffi::call_user_logged_in(&user_uuid);
     }
 
-    pub(crate) fn cmd_logout(&mut self, addr: SocketAddr) {
+    pub fn cmd_logout(&mut self, addr: SocketAddr) {
         if let Some(client) = self.clients.get_mut(&addr) {
             if let Some(uuid) = &client.uuid {
                 ffi::call_user_logged_out(uuid);
@@ -76,7 +84,7 @@ impl Server {
         }
     }
 
-    pub(crate) fn cmd_send(&mut self, addr: SocketAddr, args: &[String]) {
+    pub fn cmd_send(&mut self, addr: SocketAddr, args: &[String]) {
         if args.len() != 3 {
             self.send_to(addr, "400 Bad Request: /send \"user_uuid\" \"message\"");
             return;
@@ -124,7 +132,7 @@ impl Server {
         self.send_to(addr, "200 Message Sent");
     }
 
-    pub(crate) fn cmd_use(&mut self, addr: SocketAddr, args: &[String]) {
+    pub fn cmd_use(&mut self, addr: SocketAddr, args: &[String]) {
         let client_uuid = match self.get_client_uuid(addr) {
             Some(uuid) => uuid,
             None => {
@@ -232,7 +240,7 @@ impl Server {
         }
     }
 
-    pub(crate) fn cmd_users(&mut self, addr: SocketAddr) {
+    pub fn cmd_users(&mut self, addr: SocketAddr) {
         if self.get_client_uuid(addr).is_none() {
             self.send_to(addr, "401 Unauthorized: Please login first");
             return;
@@ -246,7 +254,7 @@ impl Server {
         self.send_to(addr, &response);
     }
 
-    pub(crate) fn cmd_user(&mut self, addr: SocketAddr, args: &[String]) {
+    pub fn cmd_user(&mut self, addr: SocketAddr, args: &[String]) {
         if args.len() != 2 {
             self.send_to(addr, "400 Bad Request");
             return;
@@ -269,7 +277,7 @@ impl Server {
         }
     }
 
-    pub(crate) fn cmd_messages(&mut self, addr: SocketAddr, args: &[String]) {
+    pub fn cmd_messages(&mut self, addr: SocketAddr, args: &[String]) {
         if args.len() != 2 {
             self.send_to(addr, "400 Bad Request");
             return;
@@ -302,7 +310,7 @@ impl Server {
         self.send_to(addr, &response);
     }
 
-    pub(crate) fn cmd_subscribe(&mut self, addr: SocketAddr, args: &[String]) {
+    pub fn cmd_subscribe(&mut self, addr: SocketAddr, args: &[String]) {
         if args.len() != 2 {
             self.send_to(addr, "400 Bad Request");
             return;
@@ -327,7 +335,7 @@ impl Server {
         }
     }
 
-    pub(crate) fn cmd_unsubscribe(&mut self, addr: SocketAddr, args: &[String]) {
+    pub fn cmd_unsubscribe(&mut self, addr: SocketAddr, args: &[String]) {
         if args.len() != 2 {
             self.send_to(addr, "400 Bad Request");
             return;
@@ -358,7 +366,7 @@ impl Server {
         }
     }
 
-    pub(crate) fn cmd_create(&mut self, addr: SocketAddr, args: &[String]) {
+    pub fn cmd_create(&mut self, addr: SocketAddr, args: &[String]) {
         let client = match self.clients.get(&addr) {
             Some(c) => c,
             None => return,
@@ -588,7 +596,7 @@ impl Server {
         }
     }
 
-    pub(crate) fn cmd_list(&mut self, addr: SocketAddr) {
+    pub fn cmd_list(&mut self, addr: SocketAddr) {
         let client = match self.clients.get(&addr) {
             Some(c) => c,
             None => return,
@@ -707,7 +715,7 @@ impl Server {
         }
     }
 
-    pub(crate) fn cmd_info(&mut self, addr: SocketAddr) {
+    pub fn cmd_info(&mut self, addr: SocketAddr) {
         let client = match self.clients.get(&addr) {
             Some(c) => c,
             None => return,
@@ -821,7 +829,7 @@ impl Server {
         }
     }
 
-    pub(crate) fn cmd_subscribed(&mut self, addr: SocketAddr, args: &[String]) {
+    pub fn cmd_subscribed(&mut self, addr: SocketAddr, args: &[String]) {
         let client_uuid = match self.get_client_uuid(addr) {
             Some(uuid) => uuid,
             None => {
