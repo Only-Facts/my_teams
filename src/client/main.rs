@@ -1,5 +1,5 @@
 use std::{
-    io::{BufRead, BufReader, Write, stdin},
+    io::{BufRead, BufReader, Write},
     net::TcpStream,
     sync::{Arc, Mutex},
     thread,
@@ -7,18 +7,12 @@ use std::{
 
 use my_teams::ffi;
 
+const HELP_FLAG: &str = "USAGE: ./myteams_cli ip port\n\n ip is the server ip address on which the server socket listens\n port is the port number on which the server socket listens";
+
 #[derive(Default)]
 struct ClientState {
     uuid: String,
     name: String,
-}
-
-fn parse_status(value: &str) -> i32 {
-    value.parse::<i32>().unwrap_or(0)
-}
-
-fn parse_timestamp(value: &str) -> u64 {
-    value.parse::<u64>().unwrap_or(0)
 }
 
 fn handle_not_found(message: &str, parts: &[&str]) {
@@ -75,12 +69,16 @@ fn handle_server_message(message: &str, state: &Arc<Mutex<ClientState>>) {
             for user_data in parts.iter().skip(1) {
                 let u_parts: Vec<&str> = user_data.split(':').collect();
                 if u_parts.len() == 3 {
-                    ffi::call_client_print_users(u_parts[0], u_parts[1], parse_status(u_parts[2]));
+                    ffi::call_client_print_users(
+                        u_parts[0],
+                        u_parts[1],
+                        u_parts[2].parse::<i32>().unwrap_or(0),
+                    );
                 }
             }
         }
         "200 USER" | "200 INFO_USER" if parts.len() == 4 => {
-            ffi::call_client_print_user(parts[1], parts[2], parse_status(parts[3]));
+            ffi::call_client_print_user(parts[1], parts[2], parts[3].parse::<i32>().unwrap_or(0));
         }
         "200 MESSAGES" => {
             for msg_data in parts.iter().skip(1) {
@@ -88,7 +86,7 @@ fn handle_server_message(message: &str, state: &Arc<Mutex<ClientState>>) {
                 if m_parts.len() == 3 {
                     ffi::call_client_private_message_print_messages(
                         m_parts[0],
-                        parse_timestamp(m_parts[1]),
+                        m_parts[1].parse::<u64>().unwrap_or(0),
                         m_parts[2],
                     );
                 }
@@ -104,7 +102,7 @@ fn handle_server_message(message: &str, state: &Arc<Mutex<ClientState>>) {
             ffi::call_client_print_thread_created(
                 parts[1],
                 parts[2],
-                parse_timestamp(parts[3]),
+                parts[3].parse::<u64>().unwrap_or(0),
                 parts[4],
                 parts[5],
             );
@@ -113,7 +111,7 @@ fn handle_server_message(message: &str, state: &Arc<Mutex<ClientState>>) {
             ffi::call_client_print_reply_created(
                 parts[1],
                 parts[2],
-                parse_timestamp(parts[3]),
+                parts[3].parse::<u64>().unwrap_or(0),
                 parts[4],
             );
         }
@@ -146,7 +144,7 @@ fn handle_server_message(message: &str, state: &Arc<Mutex<ClientState>>) {
                     ffi::call_client_channel_print_threads(
                         t_parts[0],
                         t_parts[1],
-                        parse_timestamp(t_parts[2]),
+                        t_parts[2].parse::<u64>().unwrap_or(0),
                         t_parts[3],
                         t_parts[4],
                     );
@@ -160,7 +158,7 @@ fn handle_server_message(message: &str, state: &Arc<Mutex<ClientState>>) {
                     ffi::call_client_thread_print_replies(
                         r_parts[0],
                         r_parts[1],
-                        parse_timestamp(r_parts[2]),
+                        r_parts[2].parse::<u64>().unwrap_or(0),
                         r_parts[3],
                     );
                 }
@@ -170,7 +168,11 @@ fn handle_server_message(message: &str, state: &Arc<Mutex<ClientState>>) {
             for user_data in parts.iter().skip(1) {
                 let u_parts: Vec<&str> = user_data.split(':').collect();
                 if u_parts.len() == 3 {
-                    ffi::call_client_print_users(u_parts[0], u_parts[1], parse_status(u_parts[2]));
+                    ffi::call_client_print_users(
+                        u_parts[0],
+                        u_parts[1],
+                        u_parts[2].parse::<i32>().unwrap_or(0),
+                    );
                 }
             }
         }
@@ -184,7 +186,7 @@ fn handle_server_message(message: &str, state: &Arc<Mutex<ClientState>>) {
             ffi::call_client_print_thread(
                 parts[1],
                 parts[2],
-                parse_timestamp(parts[3]),
+                parts[3].parse::<u64>().unwrap_or(0),
                 parts[4],
                 parts[5],
             );
@@ -198,13 +200,27 @@ fn handle_server_message(message: &str, state: &Arc<Mutex<ClientState>>) {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if let Some(flag) = args.get(1)
+        && flag == "--help"
+    {
+        println!("{HELP_FLAG}");
+        std::process::exit(0);
+    }
     if args.len() != 3 {
-        println!("USAGE: ./myteams_cli ip port");
-        return;
+        println!("{HELP_FLAG}");
+        std::process::exit(84);
     }
 
     let addr = format!("{}:{}", args[1], args[2]);
-    let mut stream = TcpStream::connect(&addr).expect("Could not connect to server");
+
+    let mut stream = match TcpStream::connect(&addr) {
+        Ok(s) => s,
+        Err(e) => {
+            println!("Error connecting to server: {e}");
+            std::process::exit(84);
+        }
+    };
+
     println!("Connected to server {addr}");
 
     let stream_clone = stream.try_clone().expect("Error cloning TcpStream");
@@ -212,32 +228,38 @@ fn main() {
     let state_clone = Arc::clone(&state);
 
     thread::spawn(move || {
-        let reader = BufReader::new(stream_clone);
-        for line in reader.lines() {
-            match line {
-                Ok(message) => handle_server_message(&message, &state_clone),
-                Err(_) => {
-                    println!("Disconnected from server");
-                    break;
-                }
-            }
+        let mut reader = BufReader::new(stream_clone);
+        let mut line = String::new();
+
+        while match reader.read_line(&mut line) {
+            Ok(bytes) => bytes > 0,
+            Err(_) => false,
+        } {
+            handle_server_message(line.trim_end(), &state_clone);
+            line.clear();
         }
+        println!("Connexion closed by server.");
+        std::process::exit(0);
     });
 
-    let stdin = stdin();
+    let stdin = std::io::stdin();
     for line in stdin.lock().lines() {
-        match line {
-            Ok(cmd) => {
-                if stream.write_all(cmd.as_bytes()).is_err() {
-                    println!("Failed to send command");
-                    break;
-                }
-                if stream.write_all(b"\n").is_err() {
-                    println!("Failed to send command");
-                    break;
-                }
+        let mut command = match line {
+            Ok(cmd) => cmd,
+            Err(e) => {
+                println!("Error reading stdin: {e}");
+                break;
             }
-            Err(_) => break,
+        };
+
+        if command.is_empty() {
+            break;
+        }
+
+        command.push('\n');
+        if stream.write_all(command.as_bytes()).is_err() {
+            println!("Error sending command.");
+            break;
         }
     }
 }
