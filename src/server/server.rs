@@ -10,9 +10,9 @@ use my_teams::ffi;
 use crate::{client::Client, models::Database};
 
 pub struct Server {
-    pub(crate) listener: TcpListener,
-    pub(crate) clients: HashMap<SocketAddr, Client>,
-    pub(crate) db: Database,
+    pub listener: TcpListener,
+    pub clients: HashMap<SocketAddr, Client>,
+    pub db: Database,
 }
 
 impl Server {
@@ -41,6 +41,32 @@ impl Server {
             Err(e) if e.kind() == ErrorKind::WouldBlock => {}
             Err(e) => println!("Error accepting new client: {e}"),
         }
+    }
+
+    fn parse_command_args(command_line: &str) -> Result<Vec<String>, String> {
+        let mut args = Vec::new();
+        let mut current_arg = String::new();
+        let mut in_quotes = false;
+
+        for c in command_line.chars() {
+            match c {
+                '"' => in_quotes = !in_quotes,
+                c if c.is_whitespace() && !in_quotes => {
+                    if !current_arg.is_empty() {
+                        args.push(current_arg.clone());
+                        current_arg.clear();
+                    }
+                }
+                _ => current_arg.push(c),
+            }
+        }
+        if in_quotes {
+            return Err("400 Bad Request".to_string());
+        }
+        if !current_arg.is_empty() {
+            args.push(current_arg);
+        }
+        Ok(args)
     }
 
     fn handle_command(&mut self, addr: SocketAddr, command_line: &str) {
@@ -126,6 +152,16 @@ impl Server {
         }
     }
 
+    pub fn send_to(&mut self, addr: SocketAddr, msg: &str) {
+        if let Some(client) = self.clients.get_mut(&addr) {
+            client.queue_message(msg);
+        }
+    }
+
+    pub fn get_client_uuid(&self, addr: SocketAddr) -> Option<String> {
+        self.clients.get(&addr)?.uuid.clone()
+    }
+
     pub fn run(&mut self) {
         println!("Server listening...");
 
@@ -140,78 +176,5 @@ impl Server {
         if let Err(e) = self.db.save_to_file("myteams.data") {
             println!("Error saving data: {e}");
         }
-    }
-
-    pub(crate) fn parse_command_args(command_line: &str) -> Result<Vec<String>, String> {
-        let line = command_line.trim();
-        if line.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        let bytes = line.as_bytes();
-        let len = bytes.len();
-        let mut i = 0;
-
-        while i < len && bytes[i].is_ascii_whitespace() {
-            i += 1;
-        }
-
-        let command_start = i;
-        while i < len && !bytes[i].is_ascii_whitespace() {
-            if bytes[i] == b'"' {
-                return Err("command must not be quoted".to_string());
-            }
-            i += 1;
-        }
-
-        if command_start == i {
-            return Err("missing command".to_string());
-        }
-
-        let mut args = vec![line[command_start..i].to_string()];
-
-        while i < len {
-            while i < len && bytes[i].is_ascii_whitespace() {
-                i += 1;
-            }
-
-            if i >= len {
-                break;
-            }
-
-            if bytes[i] != b'"' {
-                return Err("arguments must be quoted".to_string());
-            }
-
-            i += 1;
-            let arg_start = i;
-
-            while i < len && bytes[i] != b'"' {
-                i += 1;
-            }
-
-            if i >= len {
-                return Err("missing closing quote".to_string());
-            }
-
-            args.push(line[arg_start..i].to_string());
-            i += 1;
-
-            if i < len && !bytes[i].is_ascii_whitespace() {
-                return Err("unexpected characters after quoted argument".to_string());
-            }
-        }
-
-        Ok(args)
-    }
-
-    pub(crate) fn send_to(&mut self, addr: SocketAddr, msg: &str) {
-        if let Some(client) = self.clients.get_mut(&addr) {
-            client.queue_message(msg);
-        }
-    }
-
-    pub(crate) fn get_client_uuid(&self, addr: SocketAddr) -> Option<String> {
-        self.clients.get(&addr)?.uuid.clone()
     }
 }
