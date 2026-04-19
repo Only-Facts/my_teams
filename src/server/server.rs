@@ -7,10 +7,7 @@ use std::{
 
 use my_teams::ffi;
 
-use crate::{
-    client::Client,
-    models::Database,
-};
+use crate::{client::Client, models::Database};
 
 pub struct Server {
     pub(crate) listener: TcpListener,
@@ -47,7 +44,14 @@ impl Server {
     }
 
     fn handle_command(&mut self, addr: SocketAddr, command_line: &str) {
-        let args = Self::parse_command_args(command_line);
+        let args = match Self::parse_command_args(command_line) {
+            Ok(args) => args,
+            Err(_) => {
+                self.send_to(addr, "400 Bad Request");
+                return;
+            }
+        };
+
         if args.is_empty() {
             return;
         }
@@ -137,27 +141,67 @@ impl Server {
         }
     }
 
-    pub(crate) fn parse_command_args(command_line: &str) -> Vec<String> {
-        let mut args = Vec::new();
-        let mut current_arg = String::new();
-        let mut in_quotes = false;
+    pub(crate) fn parse_command_args(command_line: &str) -> Result<Vec<String>, String> {
+        let line = command_line.trim();
+        if line.is_empty() {
+            return Ok(Vec::new());
+        }
 
-        for c in command_line.chars() {
-            match c {
-                '"' => in_quotes = !in_quotes,
-                c if c.is_whitespace() && !in_quotes => {
-                    if !current_arg.is_empty() {
-                        args.push(current_arg.clone());
-                        current_arg.clear();
-                    }
-                }
-                _ => current_arg.push(c),
+        let bytes = line.as_bytes();
+        let len = bytes.len();
+        let mut i = 0;
+
+        while i < len && bytes[i].is_ascii_whitespace() {
+            i += 1;
+        }
+
+        let command_start = i;
+        while i < len && !bytes[i].is_ascii_whitespace() {
+            if bytes[i] == b'"' {
+                return Err("command must not be quoted".to_string());
+            }
+            i += 1;
+        }
+
+        if command_start == i {
+            return Err("missing command".to_string());
+        }
+
+        let mut args = vec![line[command_start..i].to_string()];
+
+        while i < len {
+            while i < len && bytes[i].is_ascii_whitespace() {
+                i += 1;
+            }
+
+            if i >= len {
+                break;
+            }
+
+            if bytes[i] != b'"' {
+                return Err("arguments must be quoted".to_string());
+            }
+
+            i += 1;
+            let arg_start = i;
+
+            while i < len && bytes[i] != b'"' {
+                i += 1;
+            }
+
+            if i >= len {
+                return Err("missing closing quote".to_string());
+            }
+
+            args.push(line[arg_start..i].to_string());
+            i += 1;
+
+            if i < len && !bytes[i].is_ascii_whitespace() {
+                return Err("unexpected characters after quoted argument".to_string());
             }
         }
-        if !current_arg.is_empty() {
-            args.push(current_arg);
-        }
-        args
+
+        Ok(args)
     }
 
     pub(crate) fn send_to(&mut self, addr: SocketAddr, msg: &str) {
